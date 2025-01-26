@@ -7,9 +7,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/google/uuid"
-
+	"github.com/MechamJonathan/chirpy/internal/auth"
 	"github.com/MechamJonathan/chirpy/internal/database"
+	"github.com/golang-jwt/jwt/v5"
+	"github.com/google/uuid"
 )
 
 type Chirp struct {
@@ -22,13 +23,40 @@ type Chirp struct {
 
 func (cfg *apiConfig) handler_chirps_create(w http.ResponseWriter, r *http.Request) {
 	type parameters struct {
-		Body   string    `json:"body"`
-		UserID uuid.UUID `json:"user_id"`
+		Body string `json:"body"`
+	}
+
+	// Get and validate JWT token
+	token, err := auth.GetBearerToken(r.Header)
+	if err != nil {
+		respondWithError(w, http.StatusUnauthorized, "Couldn't find JWT token", err)
+		return
+	}
+
+	// Parse and validate the token
+	claims := jwt.RegisteredClaims{}
+	parsedToken, err := jwt.ParseWithClaims(
+		token,
+		&claims,
+		func(token *jwt.Token) (interface{}, error) {
+			return []byte(cfg.jwtSecret), nil
+		},
+	)
+	if err != nil || !parsedToken.Valid {
+		respondWithError(w, http.StatusUnauthorized, "Invalid token", err)
+		return
+	}
+
+	// Parse the user ID from the token's subject claim
+	userID, err := uuid.Parse(claims.Subject)
+	if err != nil {
+		respondWithError(w, http.StatusUnauthorized, "Invalid user ID in token", err)
+		return
 	}
 
 	decoder := json.NewDecoder(r.Body)
 	params := parameters{}
-	err := decoder.Decode(&params)
+	err = decoder.Decode(&params)
 	if err != nil {
 		respondWithError(w, http.StatusInternalServerError, "Couldn't decode parameters", err)
 		return
@@ -42,7 +70,7 @@ func (cfg *apiConfig) handler_chirps_create(w http.ResponseWriter, r *http.Reque
 
 	chirp, err := cfg.db.CreateChirp(r.Context(), database.CreateChirpParams{
 		Body:   cleanedBody,
-		UserID: params.UserID,
+		UserID: userID,
 	})
 	if err != nil {
 		respondWithError(w, http.StatusInternalServerError, err.Error(), err)

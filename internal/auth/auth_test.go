@@ -2,6 +2,9 @@ package auth
 
 import (
 	"testing"
+	"time"
+
+	"github.com/google/uuid"
 )
 
 func TestCheckPas(t *testing.T) {
@@ -57,4 +60,62 @@ func TestCheckPas(t *testing.T) {
 		})
 	}
 
+}
+
+func TestJWTCreationAndValidation(t *testing.T) {
+	// Create a test UUID and secret
+	userId := uuid.New()
+	secret := "your-test-secret"
+
+	// Test token creation
+	token, err := MakeJWT(userId, secret, time.Hour)
+	if err != nil {
+		t.Fatalf("Failed to create token: %v", err)
+	}
+	if token == "" {
+		t.Fatal("Token is empty")
+	}
+
+	// Test token validation
+	validatedId, err := ValidateJWT(token, secret)
+	if err != nil {
+		t.Fatalf("Failed to validate token: %v", err)
+	}
+	if validatedId != userId {
+		t.Fatalf("User ID mismatch. Expected %v, got %v", userId, validatedId)
+	}
+}
+
+func TestExpiredToken(t *testing.T) {
+	// Create a test UUID and secret
+	userId := uuid.New()
+	secret := "your-test-secret"
+
+	// Create token that's already expired (negative duration)
+	token, err := MakeJWT(userId, secret, -time.Hour)
+	if err != nil {
+		t.Fatalf("Failed to create token: %v", err)
+	}
+
+	// Try to validate expired token
+	_, err = ValidateJWT(token, secret)
+	if err == nil {
+		t.Fatal("Expected error for expired token, got nil")
+	}
+}
+
+func TestInvalidSecretTroken(t *testing.T) {
+	userId := uuid.New()
+	secret := "secret"
+	invalidSecret := "invalid-secret"
+
+	token, err := MakeJWT(userId, secret, time.Hour)
+	if err != nil {
+		t.Fatalf("Failed to create token: %v", err)
+	}
+
+	_, err = ValidateJWT(token, invalidSecret)
+	if err == nil {
+		t.Fatal("Expected error for invalid secret, got nil")
+	}
 }
