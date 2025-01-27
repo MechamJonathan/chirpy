@@ -6,18 +6,19 @@ import (
 	"time"
 
 	"github.com/MechamJonathan/chirpy/internal/auth"
+	"github.com/MechamJonathan/chirpy/internal/database"
 	"github.com/golang-jwt/jwt/v5"
 )
 
 func (cfg *apiConfig) handlerLogin(w http.ResponseWriter, r *http.Request) {
 	type parameters struct {
-		Password         string `json:"password"`
-		Email            string `json:"email"`
-		ExpiresInSeconds *int   `json:"expires_in_seconds,omitempty"`
+		Password string `json:"password"`
+		Email    string `json:"email"`
 	}
 	type response struct {
 		User
-		Token string `json:"token"`
+		Token        string `json:"token"`
+		RefreshToken string `json:"refresh_token"`
 	}
 
 	decoder := json.NewDecoder(r.Body)
@@ -42,12 +43,6 @@ func (cfg *apiConfig) handlerLogin(w http.ResponseWriter, r *http.Request) {
 
 	// Default to 1 hour
 	expiresIn := 60 * 60 // 1 hour in seconds
-	if params.ExpiresInSeconds != nil {
-		// If provided, use the smaller of the requested time or 1 hour
-		if *params.ExpiresInSeconds > 0 && *params.ExpiresInSeconds < expiresIn {
-			expiresIn = *params.ExpiresInSeconds
-		}
-	}
 
 	// Create the JWT token
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.RegisteredClaims{
@@ -62,11 +57,31 @@ func (cfg *apiConfig) handlerLogin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// create refresh token
+	refreshToken, err := auth.MakeRefreshToken()
+	if err != nil {
+		respondWithError(w, http.StatusInternalServerError, "Couldn't generate refresh token", err)
+		return
+	}
+
+	expiresAt := time.Now().Add(60 * 24 * time.Hour) // 60 days
+
+	err = cfg.db.CreateRefreshToken(r.Context(), database.CreateRefreshTokenParams{
+		Token:     refreshToken,
+		UserID:    user.ID,
+		ExpiresAt: expiresAt,
+	})
+	if err != nil {
+		respondWithError(w, http.StatusInternalServerError, "Couldn't insert refresh token into database", err)
+		return
+	}
+
 	respondWithJSON(w, http.StatusOK, response{
 		User: User{
 			ID:    user.ID,
 			Email: user.Email,
 		},
-		Token: tokenString,
+		Token:        tokenString,
+		RefreshToken: refreshToken,
 	})
 }
