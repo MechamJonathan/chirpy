@@ -7,6 +7,7 @@ import (
 
 	"database/sql"
 
+	"github.com/MechamJonathan/chirpy/internal/auth"
 	"github.com/google/uuid"
 )
 
@@ -18,9 +19,19 @@ func (cfg *apiConfig) handlerWebHook(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	apiKey, err := auth.GetAPIKey(r.Header)
+	if err != nil {
+		respondWithError(w, http.StatusUnauthorized, "Couldn't get ApiKey from header", err)
+		return
+	}
+	if apiKey != cfg.polkaKey {
+		respondWithError(w, http.StatusUnauthorized, "Couldn't verify ApiKey", err)
+		return
+	}
+
 	decoder := json.NewDecoder(r.Body)
 	params := parameters{}
-	err := decoder.Decode(&params)
+	err = decoder.Decode(&params)
 	if err != nil {
 		respondWithError(w, http.StatusInternalServerError, "Couldn't decode parameters", err)
 		return
