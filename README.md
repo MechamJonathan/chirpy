@@ -2,7 +2,7 @@
 Welcome to Chirpy, a production-ready JSON API built with minimalistic tools in Go
 
 # Overview
-Chirpy is a high-performance HTTP web server written in Go, designed to demonstrate core backend development concepts using minimal dependencies. It features a production-ready JSON API with essential functionalities such as middleware, routing, logging, authentication, authorization, JWT-based security, and webhooks.
+Chirpy is a high-performance HTTP web server written in Go. It features a production-ready JSON API with essential functionalities such as middleware, routing, logging, authentication, authorization, JWT-based security, and webhooks.
 
 # Features
 - Production-ready JSON API
